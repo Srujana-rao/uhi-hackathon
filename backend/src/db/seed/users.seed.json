@@ -1,5 +1,13 @@
 [
   {
+    "_id": "6778c1e4f1f0a9a8f0000099",
+    "email": "admin@test.com",
+    "passwordHash": "admin123",
+    "role": "admin",
+    "createdAt": "2025-02-01T10:00:00Z",
+    "updatedAt": "2025-02-01T10:00:00Z"
+  },
+  {
     "_id": "6778c1e4f1f0a9a8f0000031",
     "email": "doctor1@test.com",
     "passwordHash": "password123",

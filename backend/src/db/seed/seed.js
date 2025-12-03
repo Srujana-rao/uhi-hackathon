@@ -1,70 +1,167 @@
-// backend/src/db/seed/seed.js
+/**
+ * backend/src/db/seed/seed.js
+ * Robust seeder for the UHI hackathon.
+ *
+ * - Converts 24-hex string _id and reference fields to ObjectId
+ * - Hashes plaintext passwords
+ * - Uses ordered:false for resilience
+ */
 
+require('dotenv').config();
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
 
-// Load config (mongoUri etc.)
-const config = require('../../config');
+const { mongoUri } = require('../../config'); // ensure this file exports mongoUri
 
-// Load models
+// Models
 const User = require('../models/User');
 const Patient = require('../models/Patient');
 const Doctor = require('../models/Doctor');
 const Staff = require('../models/Staff');
 const ConsultationEvent = require('../models/ConsultationEvent');
 const PrescriptionEvent = require('../models/PrescriptionEvent');
-// LHP + Notification models exist but we will NOT seed them for now
-// const LhpChronicCondition = require('../models/LhpChronicCondition');
-// const LhpAllergy = require('../models/LhpAllergy');
-// const LhpCurrentMedication = require('../models/LhpCurrentMedication');
-// const LhpPastProcedure = require('../models/LhpPastProcedure');
-// const Notification = require('../models/Notification');
-// const LhpSuggestion = require('../models/LhpSuggestion');
 
-const MONGO_URI = config.mongoUri;
+const seedDir = __dirname;
+const BCRYPT_SALT_ROUNDS = 10;
 
-/**
- * Safely load a seed JSON file.
- * Returns [] if file doesn't exist or is empty/invalid.
- */
+/** load seed JSON file (safe) */
 function loadSeed(name) {
   try {
-    const filePath = path.join(__dirname, `${name}.seed.json`);
+    const filePath = path.join(seedDir, `${name}.seed.json`);
     if (!fs.existsSync(filePath)) {
       console.warn(`⚠️  Seed file not found: ${name}.seed.json (skipping)`);
       return [];
     }
-
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    if (!raw.trim()) {
+    const raw = fs.readFileSync(filePath, 'utf-8').trim();
+    if (!raw) {
       console.warn(`⚠️  Seed file empty: ${name}.seed.json (skipping)`);
       return [];
     }
-
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) {
-      console.warn(`⚠️  Seed file ${name}.seed.json does not contain an array (skipping)`);
+      console.warn(`⚠️  Seed file ${name}.seed.json doesn't contain an array (skipping)`);
       return [];
     }
-
     console.log(`📄 Loaded ${parsed.length} records from ${name}.seed.json`);
     return parsed;
   } catch (err) {
-    console.error(`❌ Error loading seed file ${name}.seed.json:`, err.message);
+    console.error(`❌ Error loading ${name}.seed.json: ${err.message}`);
     return [];
   }
 }
 
+/** Detect 24-hex ObjectId-like string */
+function looksLikeObjectId(s) {
+  return typeof s === 'string' && /^[0-9a-fA-F]{24}$/.test(s);
+}
+
+// -------- FIXED castIds FUNCTION (replace the old one completely) --------
+
+function looksLikeObjectId(s) {
+  return typeof s === 'string' && /^[0-9a-fA-F]{24}$/.test(s);
+}
+
+function toObjectId(val) {
+  // Already an ObjectId? return as-is
+  if (val && typeof val === 'object' && (val._bsontype === 'ObjectID' || (val.constructor && val.constructor.name === 'ObjectId'))) {
+    return val;
+  }
+  // If it looks like a string ObjectId, convert properly using new
+  if (looksLikeObjectId(val)) {
+    return new mongoose.Types.ObjectId(val);
+  }
+  return val;
+}
+
+function castIds(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+
+  const idFields = [
+    '_id', 'patientId', 'doctorId', 'staffId', 'createdByUserId',
+    'linkedConsultationId', 'prescriptionId', 'dispensedByStaffId'
+  ];
+
+  const copy = { ...obj };
+
+  // top-level ids
+  for (const f of idFields) {
+    if (copy[f]) {
+      copy[f] = toObjectId(copy[f]);
+    }
+  }
+
+  // SOAP current
+  if (copy.soap?.current?.editedByUserId) {
+    copy.soap.current.editedByUserId = toObjectId(copy.soap.current.editedByUserId);
+  }
+
+  // SOAP history
+  if (Array.isArray(copy.soap?.history)) {
+    copy.soap.history = copy.soap.history.map(h => ({
+      ...h,
+      editedByUserId: h.editedByUserId ? toObjectId(h.editedByUserId) : h.editedByUserId
+    }));
+  }
+
+  // meds current
+  if (copy.meds?.current?.editedByUserId) {
+    copy.meds.current.editedByUserId = toObjectId(copy.meds.current.editedByUserId);
+  }
+
+  // meds history
+  if (Array.isArray(copy.meds?.history)) {
+    copy.meds.history = copy.meds.history.map(h => ({
+      ...h,
+      editedByUserId: h.editedByUserId ? toObjectId(h.editedByUserId) : h.editedByUserId
+    }));
+  }
+
+  return copy;
+}
+
+
+async function prepareUsers(users) {
+  return Promise.all(users.map(async u => {
+    const copy = { ...u };
+
+    // Convert _id if necessary (use toObjectId which uses `new`)
+    if (copy._id) {
+      copy._id = toObjectId(copy._id);
+    }
+
+    // Convert role-specific id refs to ObjectId too
+    if (copy.doctorId) copy.doctorId = toObjectId(copy.doctorId);
+    if (copy.patientId) copy.patientId = toObjectId(copy.patientId);
+    if (copy.staffId) copy.staffId = toObjectId(copy.staffId);
+
+    // If passwordHash looks like plain text (short), hash it
+    if (copy.passwordHash && typeof copy.passwordHash === 'string') {
+      const isProbablyPlain = copy.passwordHash.length < 30; // bcrypt hashes ~60 chars
+      if (isProbablyPlain) {
+        const hashed = await bcrypt.hash(copy.passwordHash, BCRYPT_SALT_ROUNDS);
+        copy.passwordHash = hashed;
+      }
+    }
+    return copy;
+  }));
+}
+
+
 async function run() {
   try {
-    console.log('🔌 Connecting to MongoDB:', MONGO_URI);
-    await mongoose.connect(MONGO_URI);
+    if (!mongoUri && !process.env.MONGO_URI) {
+      console.error('❌ No MONGO_URI in config or env. Set it and retry.');
+      process.exit(1);
+    }
+    const uri = mongoUri || process.env.MONGO_URI;
+    console.log('🔌 Connecting to MongoDB:', uri);
+    await mongoose.connect(uri);
     console.log('✅ Connected to MongoDB');
 
-    // 1️⃣ Clear existing data from the collections we are seeding
-    console.log('🧹 Clearing existing data...');
-
+    // Clear collections we will seed
+    console.log('🧹 Clearing target collections (User, Patient, Doctor, Staff, ConsultationEvent, PrescriptionEvent)');
     await Promise.all([
       User.deleteMany({}),
       Patient.deleteMany({}),
@@ -72,99 +169,53 @@ async function run() {
       Staff.deleteMany({}),
       ConsultationEvent.deleteMany({}),
       PrescriptionEvent.deleteMany({})
-      // LHP + notifications left untouched for now
-      // LhpChronicCondition.deleteMany({}),
-      // LhpAllergy.deleteMany({}),
-      // LhpCurrentMedication.deleteMany({}),
-      // LhpPastProcedure.deleteMany({}),
-      // Notification.deleteMany({}),
-      // LhpSuggestion.deleteMany({})
     ]);
+    console.log('🧼 Cleared.');
 
-    console.log('🧼 Collections cleared.');
+    // Load seed files
+    const patientsRaw = loadSeed('patients');
+    const doctorsRaw = loadSeed('doctors');
+    const staffRaw = loadSeed('staff');
+    const usersRaw = loadSeed('users');
+    const consultationsRaw = loadSeed('consultations');
+    const prescriptionsRaw = loadSeed('prescriptions');
 
-    // 2️⃣ Load seed data (only the ones you have created for now)
-    const patients = loadSeed('patients');
-    const doctors = loadSeed('doctors');
-    const staff = loadSeed('staff');
-    const users = loadSeed('users');
-    const consultations = loadSeed('consultations');
-    const prescriptions = loadSeed('prescriptions');
+    // Cast and prepare documents
+    const patients = patientsRaw.map(p => castIds(p));
+    const doctors = doctorsRaw.map(d => castIds(d));
+    const staff = staffRaw.map(s => castIds(s));
+    const users = await prepareUsers(usersRaw);
+    const consultations = consultationsRaw.map(c => castIds(c));
+    const prescriptions = prescriptionsRaw.map(p => castIds(p));
 
-    // 3️⃣ Insert in dependency order
-    //    Patients/Doctors/Staff → Users → Consultations → Prescriptions
-
+    // Insert with ordered:false so one bad doc doesn't stop the rest
     if (patients.length) {
-      await Patient.insertMany(patients);
+      await Patient.insertMany(patients, { ordered: false });
       console.log(`✅ Inserted ${patients.length} patients`);
     }
-
     if (doctors.length) {
-      await Doctor.insertMany(doctors);
+      await Doctor.insertMany(doctors, { ordered: false });
       console.log(`✅ Inserted ${doctors.length} doctors`);
     }
-
     if (staff.length) {
-      await Staff.insertMany(staff);
+      await Staff.insertMany(staff, { ordered: false });
       console.log(`✅ Inserted ${staff.length} staff`);
     }
-
     if (users.length) {
-      await User.insertMany(users);
+      await User.insertMany(users, { ordered: false });
       console.log(`✅ Inserted ${users.length} users`);
     }
-
     if (consultations.length) {
-      await ConsultationEvent.insertMany(consultations);
+      await ConsultationEvent.insertMany(consultations, { ordered: false });
       console.log(`✅ Inserted ${consultations.length} consultations`);
     }
-
     if (prescriptions.length) {
-      await PrescriptionEvent.insertMany(prescriptions);
+      await PrescriptionEvent.insertMany(prescriptions, { ordered: false });
       console.log(`✅ Inserted ${prescriptions.length} prescriptions`);
     }
 
-    // LHP + notifications seeding will be added later when you create the JSON files
-    // const chronic = loadSeed('lhpChronicConditions');
-    // if (chronic.length) {
-    //   await LhpChronicCondition.insertMany(chronic);
-    //   console.log(`✅ Inserted ${chronic.length} chronic conditions`);
-    // }
-
-    // const allergies = loadSeed('lhpAllergies');
-    // if (allergies.length) {
-    //   await LhpAllergy.insertMany(allergies);
-    //   console.log(`✅ Inserted ${allergies.length} allergies`);
-    // }
-
-    // const currentMeds = loadSeed('lhpCurrentMedications');
-    // if (currentMeds.length) {
-    //   await LhpCurrentMedication.insertMany(currentMeds);
-    //   console.log(`✅ Inserted ${currentMeds.length} current meds`);
-    // }
-
-    // const pastProcedures = loadSeed('lhpPastProcedures');
-    // if (pastProcedures.length) {
-    //   await LhpPastProcedure.insertMany(pastProcedures);
-    //   console.log(`✅ Inserted ${pastProcedures.length} past procedures`);
-    // }
-
-    // const notifications = loadSeed('notifications');
-    // if (notifications.length) {
-    //   await Notification.insertMany(notifications);
-    //   console.log(`✅ Inserted ${notifications.length} notifications`);
-    // }
-
-    // const lhpSuggestions = loadSeed('lhpSuggestions');
-    // if (lhpSuggestions.length) {
-    //   await LhpSuggestion.insertMany(lhpSuggestions);
-    //   console.log(`✅ Inserted ${lhpSuggestions.length} LHP suggestions`);
-    // }
-
-    console.log('🌱 Seed data inserted successfully');
-
+    console.log('🌱 Seed completed');
     await mongoose.disconnect();
-    console.log('🔌 Disconnected from MongoDB');
     process.exit(0);
   } catch (err) {
     console.error('❌ Seed error:', err);

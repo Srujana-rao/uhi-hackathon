@@ -73,3 +73,18 @@ frontend/*.js.map
 # Yarn / npm workspaces
 .yarn/*
 .pnp.*
+# local envs
+backend/.env
+frontend/.env
+.env
+
+# node & locks (you can keep lockfiles if you want, but avoid committing unwanted ones)
+node_modules/
+**/node_modules/
+package-lock.json
+yarn.lock
+
+# uploads and build artifacts
+backend/src/uploads/
+frontend/dist/
+TMP/

@@ -1,0 +1,5 @@
+{
+  "medications": [
+    {"name":"Paracetamol","dosage":"500mg","frequency":"TID","duration":"5 days","route":"oral","instructions":"after food","isCurrent":true}
+  ]
+}
