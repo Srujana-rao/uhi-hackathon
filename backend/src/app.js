@@ -17,4 +17,8 @@ app.use('/api', routes);
 // error handler last
 app.use(errorHandler);
 
+app.get('/health', (req,res)=> res.json({ok:true, time: new Date()}));
+
+
+
 module.exports = app;

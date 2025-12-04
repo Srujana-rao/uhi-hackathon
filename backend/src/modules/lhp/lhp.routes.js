@@ -1,8 +1,10 @@
+// backend/src/modules/lhp/lhp.routes.js
 const express = require('express');
 const router = express.Router();
-const ctrl = require('./lhp.controller');
+const controller = require('./lhp.controller');
+const { requireAuth } = require('../../middleware/authMiddleware');
 
-router.get('/patient/:patientId', ctrl.getLhpForPatient);
-router.post('/patient/:patientId/suggestions', ctrl.createSuggestion);
+router.get('/:patientId', requireAuth, controller.getLhpForPatient);
+router.post('/:patientId/suggestions', requireAuth, controller.createSuggestion);
 
 module.exports = router;
