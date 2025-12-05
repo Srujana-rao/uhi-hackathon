@@ -1,29 +1,56 @@
+/**
+ * auth.controller.js
+ * - basic login implementation that issues JWT including doctorId/patientId/staffId when available
+ * - safe: uses password compare via bcrypt (assumes user.passwordHash exists)
+ * - Adapt to your existing user lookup if function names/path differ.
+ */
+
 const jwt = require('jsonwebtoken');
-const User = require('../../db/models/User'); // ensure this model exists
 const bcrypt = require('bcryptjs');
+const User = require('../../db/models/User');
 
-const adminLogin = async (req, res) => {
-  const { apiKey } = req.body;
-  if (!apiKey) return res.status(400).json({ error: 'apiKey required' });
-  if (apiKey !== process.env.ADMIN_API_KEY) {
-    return res.status(401).json({ error: 'Invalid admin key' });
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '12h';
+
+// Helper: sign token with extra ids when present
+function signTokenForUser(user) {
+  const payload = {
+    sub: String(user._id),
+    role: user.role
+  };
+
+  // include pointers if they exist on the user doc
+  if (user.doctorId) payload.doctorId = String(user.doctorId);
+  if (user.patientId) payload.patientId = String(user.patientId);
+  if (user.staffId) payload.staffId = String(user.staffId);
+
+  // optional convenience fields
+  if (user.email) payload.email = user.email;
+  if (user.name) payload.name = user.name;
+
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+// POST /api/auth/login
+// body: { email, password }
+async function login(req, res, next) {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+
+    const user = await User.findOne({ email }).lean().exec();
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+
+    // If you store passwordHash on user, verify it. If you use a different scheme adapt this.
+    const passwordHash = user.passwordHash || user.password; // fallback
+    const ok = passwordHash ? await bcrypt.compare(password, passwordHash) : false;
+    if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+
+    const token = signTokenForUser(user);
+    return res.json({ token, role: user.role, userId: String(user._id) });
+  } catch (err) {
+    return next(err);
   }
+}
 
-  const payload = { sub: 'admin', role: 'admin', name: 'UHI Admin' };
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '8h' });
-  return res.json({ token, role: 'admin' });
-};
-
-const login = async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'email & password required' });
-  const user = await User.findOne({ email });
-  if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-  const payload = { sub: user._id.toString(), role: user.role, name: user.name };
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '8h' });
-  res.json({ token, role: user.role, userId: user._id });
-};
-
-module.exports = { adminLogin, login };
+module.exports = { login, signTokenForUser };

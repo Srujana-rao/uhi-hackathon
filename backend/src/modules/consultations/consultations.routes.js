@@ -1,11 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('./consultations.controller');
+const { requireAuth } = require('../../middleware/authMiddleware');
 
+// Protect all consultation endpoints
+router.use(requireAuth);
+
+// List consultations (role-filtered in controller)
 router.get('/', ctrl.list);
-router.get('/:id', ctrl.get);
+
+// Get consultation by id
+router.get('/:id', ctrl.getById);
+
+// Create consultation
 router.post('/', ctrl.create);
-router.post('/:id/upload-audio', ctrl.uploadAudio); // placeholder
-router.put('/:id/verify', ctrl.verify);
+
+// Verify consultation (doctor action)
+router.put('/:id/verify', ctrl.verifySoap);
+
+// NOTE: upload-audio placeholder removed (controller has no uploadAudio implementation).
+// If you add audio upload later, re-add an endpoint here and implement ctrl.uploadAudio.
 
 module.exports = router;
