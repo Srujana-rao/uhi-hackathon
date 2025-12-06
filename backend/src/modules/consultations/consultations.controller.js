@@ -86,6 +86,58 @@ async function create(req, res, next) {
 }
 
 /**
+ * Generic PATCH update
+ * - allows updating audioPath, transcript, etc.
+ * - if body.soap is flat, wraps it into soap.current and preserves existing history
+ */
+async function update(req, res, next) {
+  try {
+    const id = req.params.id;
+    const user = req.user || {};
+
+    const existing = await svc.getById(id);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Not found' });
+    }
+
+    // Access control: only owning doctor or admin can patch
+    if (user.role === 'doctor' && String(existing.doctorId) !== String(user.doctorId)) {
+      return res.status(403).json({ success: false, message: 'Forbidden: not your consultation' });
+    }
+    if (user.role === 'patient') {
+      // for now: patients cannot patch; adjust if you want later
+      return res.status(403).json({ success: false, message: 'Forbidden for patients' });
+    }
+
+    const payload = { ...(req.body || {}) };
+
+    // Special handling for SOAP: if they send a flat soap object, convert to { current, history }
+    if (payload.soap && !payload.soap.current) {
+      const s = payload.soap;
+      const history = Array.isArray(existing.soap?.history) ? existing.soap.history : [];
+
+      payload.soap = {
+        current: {
+          subjective: s.subjective,
+          objective: s.objective,
+          assessment: s.assessment,
+          plan: s.plan,
+          editedByUserId: user.userId || user.sub || existing.createdByUserId,
+          editedByRole: user.role || existing.createdByRole,
+          editedAt: new Date()
+        },
+        history
+      };
+    }
+
+    const updated = await svc.update(id, payload);
+    return res.json({ success: true, data: updated });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
  * verifySoap - doctor action
  * - pushes existing soap.current into soap.history (if present)
  * - updates current soap and marks VERIFIED_DOCTOR
@@ -140,4 +192,4 @@ async function verifySoap(req, res, next) {
   }
 }
 
-module.exports = { list, getById, create, verifySoap };
+module.exports = { list, getById, create, update, verifySoap };

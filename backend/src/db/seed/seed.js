@@ -138,31 +138,62 @@ function castIds(obj) {
 }
 
 
-async function prepareUsers(users) {
-  return Promise.all(users.map(async u => {
-    const copy = { ...u };
+async function prepareUsers(users, { doctors = [], patients = [], staff = [] } = {}) {
+  // Build quick lookup maps by _id (string)
+  const doctorMap = new Map(doctors.map(d => [String(d._id), d]));
+  const patientMap = new Map(patients.map(p => [String(p._id), p]));
+  const staffMap = new Map(staff.map(s => [String(s._id), s]));
 
-    // Convert _id if necessary (use toObjectId which uses `new`)
-    if (copy._id) {
-      copy._id = toObjectId(copy._id);
-    }
+  return Promise.all(
+    users.map(async (u) => {
+      const copy = { ...u };
 
-    // Convert role-specific id refs to ObjectId too
-    if (copy.doctorId) copy.doctorId = toObjectId(copy.doctorId);
-    if (copy.patientId) copy.patientId = toObjectId(copy.patientId);
-    if (copy.staffId) copy.staffId = toObjectId(copy.staffId);
-
-    // If passwordHash looks like plain text (short), hash it
-    if (copy.passwordHash && typeof copy.passwordHash === 'string') {
-      const isProbablyPlain = copy.passwordHash.length < 30; // bcrypt hashes ~60 chars
-      if (isProbablyPlain) {
-        const hashed = await bcrypt.hash(copy.passwordHash, BCRYPT_SALT_ROUNDS);
-        copy.passwordHash = hashed;
+      // Convert _id if necessary (use toObjectId which uses `new`)
+      if (copy._id) {
+        copy._id = toObjectId(copy._id);
       }
-    }
-    return copy;
-  }));
+
+      // Convert role-specific id refs to ObjectId too
+      if (copy.doctorId) copy.doctorId = toObjectId(copy.doctorId);
+      if (copy.patientId) copy.patientId = toObjectId(copy.patientId);
+      if (copy.staffId) copy.staffId = toObjectId(copy.staffId);
+
+      // 🔎 Derive `name` from linked role doc if missing
+      if (!copy.name) {
+        const role = (copy.role || '').toString().toLowerCase();
+
+        if (role === 'doctor' && copy.doctorId) {
+          const d = doctorMap.get(String(copy.doctorId));
+          if (d && d.name) {
+            copy.name = d.name;
+          }
+        } else if (role === 'patient' && copy.patientId) {
+          const p = patientMap.get(String(copy.patientId));
+          if (p && p.name) {
+            copy.name = p.name;
+          }
+        } else if (role === 'staff' && copy.staffId) {
+          const s = staffMap.get(String(copy.staffId));
+          if (s && s.name) {
+            copy.name = s.name;
+          }
+        }
+      }
+
+      // If passwordHash looks like plain text (short), hash it
+      if (copy.passwordHash && typeof copy.passwordHash === 'string') {
+        const isProbablyPlain = copy.passwordHash.length < 30; // bcrypt hashes ~60 chars
+        if (isProbablyPlain) {
+          const hashed = await bcrypt.hash(copy.passwordHash, BCRYPT_SALT_ROUNDS);
+          copy.passwordHash = hashed;
+        }
+      }
+
+      return copy;
+    })
+  );
 }
+
 
 
 async function run() {
@@ -214,7 +245,7 @@ async function run() {
     const patients = patientsRaw.map(p => castIds(p));
     const doctors = doctorsRaw.map(d => castIds(d));
     const staff = staffRaw.map(s => castIds(s));
-    const users = await prepareUsers(usersRaw);
+    const users = await prepareUsers(usersRaw, { doctors, patients, staff });
     const consultations = consultationsRaw.map(c => castIds(c));
     const prescriptions = prescriptionsRaw.map(p => castIds(p));
 
