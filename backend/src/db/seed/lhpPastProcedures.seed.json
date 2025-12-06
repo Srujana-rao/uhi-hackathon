@@ -1,0 +1,24 @@
+[
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000003",
+    "procedure": "Appendectomy",
+    "date": "2020-06-15T00:00:00.000Z",
+    "notes": "No complications.",
+    "status": "VERIFIED_DOCTOR",
+    "source": {
+      "type": "MANUAL",
+      "eventId": "000000000000000000000009"
+    }
+  },
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000002",
+    "procedure": "C-section",
+    "date": "2019-03-10T00:00:00.000Z",
+    "notes": "Elective; post-op stable.",
+    "status": "VERIFIED_DOCTOR",
+    "source": {
+      "type": "MANUAL",
+      "eventId": "00000000000000000000000a"
+    }
+  }
+]

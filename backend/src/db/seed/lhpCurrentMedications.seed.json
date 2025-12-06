@@ -1,0 +1,47 @@
+[
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000001",
+    "name": "Metformin",
+    "dosage": "500mg",
+    "frequency": "BID",
+    "route": "oral",
+    "startDate": "2025-01-10T00:00:00.000Z",
+    "endDate": null,
+    "isCurrent": true,
+    "status": "VERIFIED_DOCTOR",
+    "source": {
+      "type": "MANUAL",
+      "eventId": "000000000000000000000006"
+    }
+  },
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000001",
+    "name": "Amlodipine",
+    "dosage": "5mg",
+    "frequency": "OD",
+    "route": "oral",
+    "startDate": "2025-01-20T00:00:00.000Z",
+    "endDate": null,
+    "isCurrent": true,
+    "status": "UNVERIFIED",
+    "source": {
+      "type": "MANUAL",
+      "eventId": "000000000000000000000007"
+    }
+  },
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000003",
+    "name": "Paracetamol",
+    "dosage": "500mg",
+    "frequency": "SOS",
+    "route": "oral",
+    "startDate": "2025-01-05T00:00:00.000Z",
+    "endDate": "2025-01-08T00:00:00.000Z",
+    "isCurrent": false,
+    "status": "UNVERIFIED",
+    "source": {
+      "type": "MANUAL",
+      "eventId": "000000000000000000000008"
+    }
+  }
+]

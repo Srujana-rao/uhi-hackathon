@@ -16,7 +16,10 @@ router.get('/:id', ctrl.getById);
 // Create consultation
 router.post('/', ctrl.create);
 
-// Verify consultation (doctor action)
+// Generic partial update (audioPath, transcript, flat SOAP, etc.)
+router.patch('/:id', ctrl.update);
+
+// Verify consultation (doctor action, with SOAP history)
 router.put('/:id/verify', ctrl.verifySoap);
 
 // Upload audio for consultation

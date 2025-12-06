@@ -88,3 +88,4 @@ yarn.lock
 backend/src/uploads/
 frontend/dist/
 TMP/
+backend/.tokens.env

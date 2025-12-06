@@ -1,0 +1,32 @@
+[
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000001",
+    "label": "Type 2 Diabetes",
+    "notes": "Diagnosed 2 years ago. Controlled with diet and Metformin.",
+    "status": "VERIFIED_DOCTOR",
+    "source": {
+      "type": "MANUAL",
+      "eventId": "000000000000000000000001"
+    }
+  },
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000001",
+    "label": "Hypertension",
+    "notes": "Mild, started on low-dose medication.",
+    "status": "UNVERIFIED",
+    "source": {
+      "type": "MANUAL",
+      "eventId": "000000000000000000000002"
+    }
+  },
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000002",
+    "label": "Asthma",
+    "notes": "Intermittent, uses inhaler PRN.",
+    "status": "VERIFIED_DOCTOR",
+    "source": {
+      "type": "MANUAL",
+      "eventId": "000000000000000000000003"
+    }
+  }
+]

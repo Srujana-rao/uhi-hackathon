@@ -1,0 +1,44 @@
+[
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000001",
+    "doctorId": "6778c1e4f1f0a9a8f0000011",
+    "sourceType": "CONSULTATION",
+    "sourceEventId": "000000000000000000000101",
+    "section": "CHRONIC_CONDITION",
+    "proposedEntry": {
+      "label": "Dyslipidemia",
+      "notes": "AI detected elevated LDL mentioned in SOAP.",
+      "status": "UNVERIFIED"
+    },
+    "status": "PENDING"
+  },
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000001",
+    "doctorId": "6778c1e4f1f0a9a8f0000011",
+    "sourceType": "CONSULTATION",
+    "sourceEventId": "000000000000000000000102",
+    "section": "CURRENT_MED",
+    "proposedEntry": {
+      "name": "Metformin",
+      "dosage": "500mg",
+      "frequency": "BID",
+      "route": "oral",
+      "isCurrent": true
+    },
+    "status": "PENDING"
+  },
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000002",
+    "doctorId": "6778c1e4f1f0a9a8f0000012",
+    "sourceType": "CONSULTATION",
+    "sourceEventId": "000000000000000000000103",
+    "section": "ALLERGY",
+    "proposedEntry": {
+      "substance": "Dust",
+      "reaction": "Sneezing, watery eyes",
+      "severity": "mild",
+      "status": "UNVERIFIED"
+    },
+    "status": "PENDING"
+  }
+]
