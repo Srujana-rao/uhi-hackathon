@@ -1,0 +1,24 @@
+[
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000001",
+    "substance": "Penicillin",
+    "reaction": "Rash",
+    "severity": "moderate",
+    "status": "VERIFIED_DOCTOR",
+    "source": {
+      "type": "MANUAL",
+      "eventId": "000000000000000000000004"
+    }
+  },
+  {
+    "patientId": "6778c1e4f1f0a9a8f0000002",
+    "substance": "NSAIDs",
+    "reaction": "Gastric irritation",
+    "severity": "mild",
+    "status": "UNVERIFIED",
+    "source": {
+      "type": "MANUAL",
+      "eventId": "000000000000000000000005"
+    }
+  }
+]

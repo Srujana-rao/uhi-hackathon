@@ -1,52 +1,122 @@
 // backend/src/modules/lhp/lhp.controller.js
 const svc = require('./lhp.service');
-const ConsultationEvent = require('../../db/models/ConsultationEvent');
 
-exports.getLhpForPatient = async (req, res) => {
-  const patientId = req.params.patientId;
-  const requester = req.user || null;
+async function getLhp(req, res, next) {
+  try {
+    const patientId = req.params.patientId;
 
-  // require auth
-  if (!requester) return res.status(401).json({ error: 'Unauthorized' });
-
-  // If doctor, ensure they have consulted the patient before allowing access to full LHP
-  if (requester.role === 'doctor') {
-    // require doctorId is present on the token
-    if (!requester.doctorId) return res.status(403).json({ error: 'Forbidden' });
-
-    const consulted = await ConsultationEvent.findOne({
-      doctorId: requester.doctorId,
-      patientId
-    }).lean();
-
-    if (!consulted) {
-      // deny full LHP access — but you may allow limited/basic LHP fields here if desired
-      return res.status(403).json({ error: 'Doctor cannot access this LHP' });
+    // Patients can only access their own LHP
+    if (
+      req.user.role === 'patient' &&
+      String(req.user.patientId) !== String(patientId)
+    ) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
     }
+
+    const viewer = {
+      role: req.user.role,
+      userId: req.user.userId,
+      doctorId: req.user.doctorId,
+      patientId: req.user.patientId
+    };
+
+    const lhp = await svc.getLhp(patientId, viewer);
+    return res.json({ success: true, data: lhp });
+  } catch (err) {
+    next(err);
   }
+}
 
-  // For admin/staff/self or verified doctor, return data
-  const data = await svc.getForPatient(patientId);
-  res.json(data);
-};
 
-exports.createSuggestion = async (req, res) => {
-  const patientId = req.params.patientId;
-  const requester = req.user || null;
-  if (!requester) return res.status(401).json({ error: 'Unauthorized' });
-
-  // only doctor/staff/admin can create suggestion — doctor must be treating this patient
-  if (requester.role === 'doctor') {
-    if (!requester.doctorId) return res.status(403).json({ error: 'Forbidden' });
-    const consulted = await ConsultationEvent.findOne({
-      doctorId: requester.doctorId,
-      patientId
-    }).lean();
-    if (!consulted) return res.status(403).json({ error: 'Doctor cannot add suggestion for this patient' });
-  } else if (requester.role !== 'staff' && requester.role !== 'admin') {
-    return res.status(403).json({ error: 'Forbidden' });
+async function listSuggestions(req, res, next) {
+  try {
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ success: false, message: 'Only doctors can view suggestions' });
+    }
+    const doctorId = req.user.doctorId;
+    const rows = await svc.listSuggestionsForDoctor(doctorId);
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
   }
+}
 
-  const s = await svc.createSuggestion(patientId, req.body);
-  res.status(201).json(s);
+async function createSuggestion(req, res, next) {
+  try {
+    const doc = await svc.createSuggestion(req.body);
+    return res.status(201).json({ success: true, data: doc });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function actOnSuggestion(req, res, next) {
+  try {
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only doctors can act on suggestions'
+      });
+    }
+
+    const suggestionId = req.params.id;
+    const { action } = req.body; // 'accept' or 'reject'
+
+    if (!['accept', 'reject'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid action'
+      });
+    }
+
+    // 🔐 Ownership + status check
+    const suggestion = await svc.getSuggestionById(suggestionId);
+    if (!suggestion) {
+      return res.status(404).json({
+        success: false,
+        message: 'Suggestion not found'
+      });
+    }
+
+    if (String(suggestion.doctorId) !== String(req.user.doctorId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: suggestion is not assigned to this doctor'
+      });
+    }
+
+    if (suggestion.status !== 'PENDING') {
+      return res.status(400).json({
+        success: false,
+        message: 'Suggestion is not in PENDING state'
+      });
+    }
+
+    // 🔁 Reject path
+    if (action === 'reject') {
+      const updated = await svc.actOnSuggestion(
+        suggestionId,
+        action,
+        req.user.userId
+      );
+      return res.json({ success: true, data: updated });
+    }
+
+    // ✅ Accept → create entry + mark suggestion accepted
+    const createdEntry = await svc.acceptSuggestionAndCreateEntry(
+      suggestionId,
+      req.user.userId
+    );
+    return res.json({ success: true, data: createdEntry });
+  } catch (err) {
+    next(err);
+  }
+}
+
+
+module.exports = {
+  getLhp,
+  listSuggestions,
+  createSuggestion,
+  actOnSuggestion
 };

@@ -21,7 +21,13 @@ const Patient = require('../models/Patient');
 const Doctor = require('../models/Doctor');
 const Staff = require('../models/Staff');
 const ConsultationEvent = require('../models/ConsultationEvent');
-const PrescriptionEvent = require('../models/PrescriptionEvent');
+const PrescriptionEvent = require('../models/PrescriptionEvent'); // your existing line
+const LhpChronicCondition = require('../models/LhpChronicCondition');
+const LhpAllergy = require('../models/LhpAllergy');
+const LhpCurrentMedication = require('../models/LhpCurrentMedication');
+const LhpPastProcedure = require('../models/LhpPastProcedure');
+const LhpSuggestion = require('../models/LhpSuggestion');
+
 
 const seedDir = __dirname;
 const BCRYPT_SALT_ROUNDS = 10;
@@ -118,6 +124,16 @@ function castIds(obj) {
     }));
   }
 
+  // LHP: source.eventId on LHP entries
+  if (copy.source && copy.source.eventId) {
+    copy.source.eventId = toObjectId(copy.source.eventId);
+  }
+
+  // LHP: sourceEventId on suggestions
+  if (copy.sourceEventId) {
+    copy.sourceEventId = toObjectId(copy.sourceEventId);
+  }
+
   return copy;
 }
 
@@ -161,14 +177,19 @@ async function run() {
     console.log('✅ Connected to MongoDB');
 
     // Clear collections we will seed
-    console.log('🧹 Clearing target collections (User, Patient, Doctor, Staff, ConsultationEvent, PrescriptionEvent)');
+    console.log('🧹 Clearing target collections (User, Patient, Doctor, Staff, ConsultationEvent, PrescriptionEvent, LHP*)');
     await Promise.all([
       User.deleteMany({}),
       Patient.deleteMany({}),
       Doctor.deleteMany({}),
       Staff.deleteMany({}),
       ConsultationEvent.deleteMany({}),
-      PrescriptionEvent.deleteMany({})
+      PrescriptionEvent.deleteMany({}),
+      LhpChronicCondition.deleteMany({}),
+      LhpAllergy.deleteMany({}),
+      LhpCurrentMedication.deleteMany({}),
+      LhpPastProcedure.deleteMany({}),
+      LhpSuggestion.deleteMany({})
     ]);
     console.log('🧼 Cleared.');
 
@@ -180,6 +201,15 @@ async function run() {
     const consultationsRaw = loadSeed('consultations');
     const prescriptionsRaw = loadSeed('prescriptions');
 
+    // LHP
+
+    const lhpChronicRaw = loadSeed('lhpChronicConditions');
+    const lhpAllergyRaw = loadSeed('lhpAllergies');
+    const lhpCurrentMedsRaw = loadSeed('lhpCurrentMedications');
+    const lhpPastProceduresRaw = loadSeed('lhpPastProcedures');
+    const lhpSuggestionsRaw = loadSeed('lhpSuggestions');
+
+
     // Cast and prepare documents
     const patients = patientsRaw.map(p => castIds(p));
     const doctors = doctorsRaw.map(d => castIds(d));
@@ -187,6 +217,13 @@ async function run() {
     const users = await prepareUsers(usersRaw);
     const consultations = consultationsRaw.map(c => castIds(c));
     const prescriptions = prescriptionsRaw.map(p => castIds(p));
+
+    const lhpChronic = lhpChronicRaw.map(c => castIds(c));
+    const lhpAllergies = lhpAllergyRaw.map(a => castIds(a));
+    const lhpCurrentMeds = lhpCurrentMedsRaw.map(m => castIds(m));
+    const lhpPastProcedures = lhpPastProceduresRaw.map(pp => castIds(pp));
+    const lhpSuggestions = lhpSuggestionsRaw.map(s => castIds(s));
+
 
     // Insert with ordered:false so one bad doc doesn't stop the rest
     if (patients.length) {
@@ -213,6 +250,30 @@ async function run() {
       await PrescriptionEvent.insertMany(prescriptions, { ordered: false });
       console.log(`✅ Inserted ${prescriptions.length} prescriptions`);
     }
+
+    if (lhpChronic.length) {
+      await LhpChronicCondition.insertMany(lhpChronic, { ordered: false });
+      console.log(`✅ Inserted ${lhpChronic.length} LHP chronic conditions`);
+    }
+    if (lhpAllergies.length) {
+      await LhpAllergy.insertMany(lhpAllergies, { ordered: false });
+      console.log(`✅ Inserted ${lhpAllergies.length} LHP allergies`);
+    }
+    if (lhpCurrentMeds.length) {
+      await LhpCurrentMedication.insertMany(lhpCurrentMeds, { ordered: false });
+      console.log(`✅ Inserted ${lhpCurrentMeds.length} LHP current medications`);
+    }
+    if (lhpPastProcedures.length) {
+      await LhpPastProcedure.insertMany(lhpPastProcedures, { ordered: false });
+      console.log(`✅ Inserted ${lhpPastProcedures.length} LHP past procedures`);
+    }
+    if (lhpSuggestions.length) {
+      await LhpSuggestion.insertMany(lhpSuggestions, { ordered: false });
+      console.log(`✅ Inserted ${lhpSuggestions.length} LHP suggestions`);
+    }
+
+    console.log('🌱 Seed completed');
+
 
     console.log('🌱 Seed completed');
     await mongoose.disconnect();
